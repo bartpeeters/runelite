@@ -29,6 +29,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import net.runelite.api.GameObject;
 import net.runelite.api.Varbits;
+import net.runelite.api.coords.WorldPoint;
 
 @Data
 @RequiredArgsConstructor
@@ -37,10 +38,12 @@ class DriftNet
 	private final int objectId;
 	private final Varbits statusVarbit;
 	private final Varbits countVarbit;
+	private final WorldPoint[] adjacentTiles;
 
 	private GameObject net;
 	private DriftNetStatus status;
 	private int count;
+	private DriftNetStatus prevTickStatus;
 
 	String getFormattedCountText()
 	{

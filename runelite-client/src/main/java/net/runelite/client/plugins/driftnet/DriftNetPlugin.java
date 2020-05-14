@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Provides;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,8 +95,19 @@ public class DriftNetPlugin extends Plugin
 	private Map<NPC, Integer> taggedFish = new HashMap<>();
 	@Getter
 	private final List<DriftNet> NETS = ImmutableList.of(
-		new DriftNet(NullObjectID.NULL_31433, Varbits.NORTH_NET_STATUS, Varbits.NORTH_NET_CATCH_COUNT),
-		new DriftNet(NullObjectID.NULL_31434, Varbits.SOUTH_NET_STATUS, Varbits.SOUTH_NET_CATCH_COUNT));
+			new DriftNet(NullObjectID.NULL_31433, Varbits.NORTH_NET_STATUS, Varbits.NORTH_NET_CATCH_COUNT, new WorldPoint[]{
+					new WorldPoint(3746, 10297, 1),
+					new WorldPoint(3747, 10297, 1),
+					new WorldPoint(3748, 10297, 1),
+					new WorldPoint(3749, 10297, 1),
+			}),
+			new DriftNet(NullObjectID.NULL_31434, Varbits.SOUTH_NET_STATUS, Varbits.SOUTH_NET_CATCH_COUNT, new WorldPoint[]{
+					new WorldPoint(3742, 10288, 1),
+					new WorldPoint(3742, 10289, 1),
+					new WorldPoint(3742, 10290, 1),
+					new WorldPoint(3742, 10291, 1),
+					new WorldPoint(3742, 10292, 1),
+			}));
 
 	@Getter
 	private boolean inDriftNetArea;
@@ -175,12 +187,6 @@ public class DriftNetPlugin extends Plugin
 			net.setStatus(status);
 			net.setCount(count);
 		}
-
-		// When you collect any loot, all tags become invalidated
-		if (client.getVar(Varbits.DRIFT_NET_COLLECT) != 0)
-		{
-			taggedFish.clear();
-		}
 	}
 
 	@Subscribe
@@ -197,11 +203,29 @@ public class DriftNetPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick tick)
-	{
-		if (!inDriftNetArea)
-		{
+	public void onGameTick(GameTick tick) {
+		if (!inDriftNetArea) {
 			return;
+		}
+		final Player localPlayer = client.getLocalPlayer();
+
+		for (DriftNet net : NETS) {
+			DriftNetStatus netStatus = net.getStatus();
+			DriftNetStatus prevTickNetStatus = net.getPrevTickStatus();
+			if (isAcceptingFish(netStatus) || isAcceptingFish(prevTickNetStatus)) {
+				Iterator<NPC> itr = taggedFish.keySet().iterator();
+				// untag fish which are next to a net that is not accepting fish
+				while (itr.hasNext()) {
+					NPC singleTaggedFish = itr.next();
+					WorldPoint fishPoint = WorldPoint.fromLocalInstance(client, singleTaggedFish.getLocalLocation());
+					for (WorldPoint point : net.getAdjacentTiles()) {
+						if (point.distanceTo(fishPoint) == 0) {
+							itr.remove();
+						}
+					}
+				}
+			}
+			net.setPrevTickStatus(netStatus);
 		}
 
 		final int currentTickCount = client.getTickCount();
@@ -241,6 +265,10 @@ public class DriftNetPlugin extends Plugin
 		taggedFish.put(fishTarget, client.getTickCount());
 	}
 
+	private boolean isAcceptingFish(DriftNetStatus status) {
+		return status != DriftNetStatus.CATCH && status != DriftNetStatus.SET;
+	}
+
 	@Subscribe
 	public void onNpcSpawned(NpcSpawned event)
 	{
@@ -256,6 +284,7 @@ public class DriftNetPlugin extends Plugin
 	{
 		final NPC npc = event.getNpc();
 		fish.remove(npc);
+		taggedFish.remove(npc);
 	}
 
 	@Subscribe
